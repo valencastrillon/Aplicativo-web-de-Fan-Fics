@@ -1,26 +1,53 @@
-# Nocturna
+# Application Overview
 
-Quiero una intranet para una empresa basándose en las imágenes que acabo de adjuntar. Ahora bien, la página necesita un login que tenga un botón donde diga: "Probar demo". Una página de registro. Dentro del aplicativo como tal, una sección de configuración donde el usuario pueda cambiar nombre de usuario, correo electrónico y contraseña. Toda la aplicación debe tener modo oscuro también. utilizar React y Javascript.
+Nocturna is a web application designed for reading and publishing fanfiction and serialized literature. It combines advanced tagging systems and content metadata inspired by platforms like Archive of Our Own (AO3) and Wattpad with a modern, vertical-scroll reader interface based on the Webtoon aesthetic.
 
-This project was built with [Lovable](https://lovable.dev).
+The application allows users to discover stories by fandom and genre, read text-based chapters, manage personal profiles, write and edit drafts, and publish original works or fanfiction.
 
-**Live app**: https://nocturna-fanfics.lovable.app
+## Architecture and Core Stack
 
-## Build with Lovable
+The project is built as a single-page web application connected to a Cloud Backend-as-a-Service (BaaS).
 
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/3e367ea8-318a-4eb2-84d3-608f5168bd9b).
+- Frontend Framework: React with TypeScript and Vite
+- Styling: Tailwind CSS with Shadcn UI components
+- Backend & Database: Supabase (PostgreSQL)
+- Authentication: Supabase Auth (Email and Google OAuth 2.0)
+- Database Management: Drizzle ORM and SQL migration scripts
+- Testing Framework: Playwright
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+## System Features
 
-## Development
+### Reader Experience
+- Minimalist light mode interface designed for long reading sessions.
+- Interactive vertical chapter viewer with typography and background settings.
+- Advanced filtering system supporting fandom categories, relationship tags, content warnings, and ratings.
+- Chapter indexing, bookmarks, and user comments.
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+### Author Experience
+- Dashboard for managing story metadata, covers, and content warnings.
+- Chapter creation and editing interface with draft state saving.
+- Publishing workflow for releasing chapters to the public directory.
+- Support for multiple co-authors and external social links on story hubs.
 
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
-```
+### Security and Data Management
+- Row Level Security (RLS) policies implemented on PostgreSQL tables to isolate drafts and restrict profile modification to account owners.
+- Public read access rules for published stories and metadata.
+- Storage bucket policies for user avatar and story cover uploads.
+
+## Project Structure
+
+```text
+├── drizzle/
+│   ├── migrations/         # Drizzle SQL migration files
+│   └── schema.ts           # ORM schema definitions
+├── public/                 # Static assets and icons
+├── src/
+│   ├── components/         # Reusable UI components
+│   ├── pages/              # Main route views
+│   └── lib/                # Client initializations (Supabase)
+├── supabase/
+│   ├── functions/          # Serverless Edge Functions
+│   └── migrations/         # Supabase SQL migration files
+├── .env                    # Environment variables configuration (ignored by git)
+├── .gitignore              # Git ignore patterns
+└── playwright.config.ts    # E2E test suite configuration
