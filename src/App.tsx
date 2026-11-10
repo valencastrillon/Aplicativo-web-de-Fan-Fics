@@ -22,29 +22,31 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
-    <AuthProvider>
-      <TooltipProvider>
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route element={<FicLayout />}>
-              <Route index element={<Discover />} />
-              <Route path="historia/:id" element={<StoryDetail />} />
-              <Route path="biblioteca" element={<LibraryPage />} />
-              <Route path="estudio" element={<Studio />} />
-              <Route path="autor/:handle" element={<AuthorPage />} />
-              <Route path="buscar" element={<SearchPage />} />
-              <Route path="perfil" element={<Profile />} />
-              <Route path="cuenta" element={<Account />} />
-            </Route>
-            <Route path="login" element={<AuthPage mode="login" />} />
-            <Route path="registro" element={<AuthPage mode="register" />} />
-            <Route path="leer/:id/:ch" element={<Reader />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </AuthProvider>
+      <AuthProvider>
+        <TooltipProvider>
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              {/* Ruta principal configurada para mostrar el Login al entrar */}
+              <Route element={<FicLayout />}>
+                <Route index element={<AuthPage mode="login" />} />
+                <Route path="descubrir" element={<Discover />} />
+                <Route path="historia/:id" element={<StoryDetail />} />
+                <Route path="biblioteca" element={<LibraryPage />} />
+                <Route path="estudio" element={<Studio />} />
+                <Route path="autor/:handle" element={<AuthorPage />} />
+                <Route path="buscar" element={<SearchPage />} />
+                <Route path="perfil" element={<Profile />} />
+                <Route path="cuenta" element={<Account />} />
+              </Route>
+              <Route path="login" element={<AuthPage mode="login" />} />
+              <Route path="registro" element={<AuthPage mode="register" />} />
+              <Route path="leer/:id/:ch" element={<Reader />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </AuthProvider>
     </ThemeProvider>
   </QueryClientProvider>
 );
