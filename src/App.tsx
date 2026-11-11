@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import SearchPage from "./fic/pages/SearchPage";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/contexts/ThemeContext";
@@ -27,9 +27,14 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
-              {/* Ruta principal configurada para mostrar el Login al entrar */}
+              {/* Rutas sin Header (Login / Registro / Lectura) */}
+              <Route path="/" element={<AuthPage mode="login" />} />
+              <Route path="login" element={<AuthPage mode="login" />} />
+              <Route path="registro" element={<AuthPage mode="register" />} />
+              <Route path="leer/:id/:ch" element={<Reader />} />
+
+              {/* Rutas dentro de la app (CON Header/Navegación) */}
               <Route element={<FicLayout />}>
-                <Route index element={<AuthPage mode="login" />} />
                 <Route path="descubrir" element={<Discover />} />
                 <Route path="historia/:id" element={<StoryDetail />} />
                 <Route path="biblioteca" element={<LibraryPage />} />
@@ -39,9 +44,7 @@ const App = () => (
                 <Route path="perfil" element={<Profile />} />
                 <Route path="cuenta" element={<Account />} />
               </Route>
-              <Route path="login" element={<AuthPage mode="login" />} />
-              <Route path="registro" element={<AuthPage mode="register" />} />
-              <Route path="leer/:id/:ch" element={<Reader />} />
+
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

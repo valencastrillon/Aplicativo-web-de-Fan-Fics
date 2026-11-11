@@ -74,11 +74,6 @@ const Login = () => {
             <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-3 text-muted-foreground">o</span></div>
           </div>
 
-          <Button variant="outline" className="w-full active:scale-[0.98] transition-transform" onClick={handleDemo}>
-            <Play className="w-4 h-4 mr-2" />
-            Probar Demo
-          </Button>
-
           <p className="text-center text-sm text-muted-foreground mt-6">
             ¿No tienes cuenta?{" "}
             <Link to="/registro" className="text-primary font-medium hover:underline">Regístrate</Link>
