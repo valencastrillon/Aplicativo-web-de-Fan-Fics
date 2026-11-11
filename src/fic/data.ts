@@ -36,6 +36,21 @@ export const stories: Story[] = [
     reads: 98000, likes: 12400, words: 45300, chapters: ch(["Luna violeta", "Niebla verde", "Las puertas caídas"]) },
 ];
 
+// Portadas subidas desde el Estudio (guardadas en este navegador).
+const COVERS_KEY = "nocturna-covers";
+try {
+  const saved = JSON.parse(localStorage.getItem(COVERS_KEY) || "{}") as Record<string, string>;
+  stories.forEach((st) => { if (saved[st.id]) st.cover = saved[st.id]; });
+} catch { /* ignore */ }
+export const setCover = (id: string, url: string) => {
+  const st = stories.find((x) => x.id === id); if (st) st.cover = url;
+  try {
+    const saved = JSON.parse(localStorage.getItem(COVERS_KEY) || "{}");
+    localStorage.setItem(COVERS_KEY, JSON.stringify({ ...saved, [id]: url }));
+    return true;
+  } catch { return false; }
+};
+
 export const getStory = (id?: string) => stories.find((s) => s.id === id) ?? stories[0];
 export const fmt = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 100000 ? 0 : 1)}k` : `${n}`);
 

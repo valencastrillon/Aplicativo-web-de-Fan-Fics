@@ -15,6 +15,13 @@
       "when": 1794342737462,
       "tag": "0001_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794419149013,
+      "tag": "0002_restrict_select_policies",
+      "breakpoints": true
     }
   ]
 }

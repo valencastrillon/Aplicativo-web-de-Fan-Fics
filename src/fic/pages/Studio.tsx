@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { BarChart3, CalendarClock, FileText, Plus, Send, Tag as TagIcon, X, Trash2, Pencil, Eye, Heart, Users } from "lucide-react";
-import { stories, fmt, CATEGORIES, FANDOMS, sampleParagraphs } from "../data";
+import { BarChart3, CalendarClock, FileText, Plus, Send, Tag as TagIcon, X, Trash2, ImagePlus, Pencil, Eye, Heart, Users } from "lucide-react";
+import { stories, fmt, CATEGORIES, FANDOMS, sampleParagraphs, setCover } from "../data";
 import { Tag } from "../ui";
 import { followedNow } from "../library";
 import Collaborators from "../Collaborators";
@@ -87,6 +87,22 @@ export default function Studio() {
   };
 
   const s = stories.find((x) => x.id === story)!;
+  const uploadCover = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]; e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return toast.error("Elige un archivo de imagen");
+    const img = new Image();
+    img.onload = () => {
+      const w = Math.min(600, img.width), h = Math.round(img.height * (w / img.width));
+      const c = document.createElement("canvas"); c.width = w; c.height = h;
+      c.getContext("2d")!.drawImage(img, 0, 0, w, h);
+      const ok = setCover(s.id, c.toDataURL("image/jpeg", 0.85));
+      URL.revokeObjectURL(img.src); bump((x) => x + 1);
+      ok ? toast.success("Portada actualizada") : toast.error("No se pudo guardar la portada");
+    };
+    img.onerror = () => toast.error("No se pudo leer la imagen");
+    img.src = URL.createObjectURL(file);
+  };
   return (
     <main className="mx-auto max-w-7xl px-4 sm:px-6 py-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -137,6 +153,19 @@ export default function Studio() {
         </div>
 
         <aside className="space-y-6">
+          <section className="rounded-xl bg-card border border-border p-5">
+            <h2 className="font-bold">Portada de la obra</h2>
+            <div className="mt-4 flex gap-4 items-start">
+              <img src={s.cover} alt={`Portada de ${s.title}`} className="w-24 aspect-[3/4] rounded-xl object-cover border border-border" />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-muted-foreground">Usa una imagen vertical (JPG o PNG).</p>
+                <label className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-full bg-primary text-primary-foreground px-4 h-10 text-sm font-semibold">
+                  <ImagePlus className="h-4 w-4" />Subir portada
+                  <input type="file" accept="image/*" onChange={uploadCover} className="sr-only" />
+                </label>
+              </div>
+            </div>
+          </section>
           <section className="rounded-xl bg-card border border-border p-5">
             <h2 className="font-bold">Información adicional</h2>
             <p className="mt-4 text-xs text-muted-foreground">Etiquetas</p>

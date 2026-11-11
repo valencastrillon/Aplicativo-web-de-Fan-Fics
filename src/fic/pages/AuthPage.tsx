@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
-import { lovable } from "@/integrations/lovable/index";
 
 export default function AuthPage({ mode }: { mode: "login" | "register" }) {
   const isLogin = mode === "login";
@@ -25,11 +24,6 @@ export default function AuthPage({ mode }: { mode: "login" | "register" }) {
     else { toast.success("Revisa tu correo para confirmar tu cuenta."); nav("/login"); }
   };
 
-  const social = async (p: "google") => {
-    const r = await lovable.auth.signInWithOAuth(p, { redirect_uri: window.location.origin });
-    if (r.error) toast.error("No se pudo iniciar sesión");
-    else if (!r.redirected) nav("/");
-  };
 
   return (
     <div className="min-h-screen grid place-items-center bg-background px-5 py-12">
@@ -41,10 +35,6 @@ export default function AuthPage({ mode }: { mode: "login" | "register" }) {
         <h1 className="text-center text-xl font-semibold">{isLogin ? "Iniciar sesión" : "Crear cuenta"}</h1>
         <p className="text-center text-sm text-muted-foreground mt-1 mb-8">{isLogin ? "Continúa donde dejaste tu lectura." : "Únete a la comunidad de lectores y autores."}</p>
 
-        <div className="grid gap-3">
-          <Button variant="outline" className="h-11 rounded-xl" onClick={() => social("google")}>Continuar con Google</Button>
-        </div>
-        <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground"><span className="h-px flex-1 bg-border" />o con tu correo<span className="h-px flex-1 bg-border" /></div>
 
         <form onSubmit={submit} className="space-y-4">
           {!isLogin && (

@@ -1,0 +1,11 @@
+DROP POLICY IF EXISTS "Users can view all likes" ON public.post_likes;
+CREATE POLICY "Users can view own likes" ON public.post_likes FOR SELECT TO authenticated USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Posts are viewable by all authenticated users" ON public.posts;
+CREATE POLICY "Users can view own posts" ON public.posts FOR SELECT TO authenticated USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Documents are viewable by all authenticated users" ON public.documents;
+CREATE POLICY "Users can view own documents" ON public.documents FOR SELECT TO authenticated USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Comments are viewable by all authenticated users" ON public.comments;
+CREATE POLICY "Users can view own comments" ON public.comments FOR SELECT TO authenticated USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Profiles are public" ON public.profiles;
+CREATE POLICY "Users view own profile" ON public.profiles FOR SELECT TO authenticated USING (auth.uid() = id);
+DROP POLICY IF EXISTS "Avatar images are public" ON storage.objects;
