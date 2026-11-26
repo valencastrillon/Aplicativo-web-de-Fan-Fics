@@ -1,6 +1,20 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+
+const TOKEN_KEY = "nocturna_token";
+
+const authHeaders = (): Record<string, string> => {
+  const token = localStorage.getItem(TOKEN_KEY);
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+const fileToDataUrl = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 
 const getDemoDocs = (category: DocCategory): Document[] => {
   const now = Date.now();
@@ -47,25 +61,11 @@ export const useDocuments = (category: DocCategory) => {
     queryFn: async (): Promise<Document[]> => {
       if (isDemo) return getDemoDocs(category);
 
-      const { data: docs, error } = await supabase
-        .from("documents")
-        .select("*")
-        .eq("category", category)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-
-      const { data: favs } = await supabase
-        .from("favorites")
-        .select("document_id")
-        .eq("user_id", user!.id);
-
-      const favIds = new Set(favs?.map((f) => f.document_id) || []);
-
-      return (docs || []).map((d) => ({
-        ...d,
-        starred: favIds.has(d.id),
-      }));
+      const res = await fetch(`/api/documents?category=${encodeURIComponent(category)}`, {
+        headers: authHeaders(),
+      });
+      if (!res.ok) throw new Error("Error cargando documentos");
+      return res.json();
     },
     enabled: !!user,
     staleTime: isDemo ? Infinity : 0,
@@ -74,31 +74,30 @@ export const useDocuments = (category: DocCategory) => {
 
 export const useAddDocument = () => {
   const qc = useQueryClient();
-  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async (data: { title: string; description: string; category: DocCategory; file?: File }) => {
-      let file_url: string | null = null;
-      let file_name: string | null = null;
+      const file_url = data.file ? await fileToDataUrl(data.file) : null;
+      const file_name = data.file ? data.file.name : null;
 
-      if (data.file) {
-        const path = `${user!.id}/${Date.now()}_${data.file.name}`;
-        const { error: uploadError } = await supabase.storage.from("documents").upload(path, data.file);
-        if (uploadError) throw uploadError;
-        const { data: urlData } = supabase.storage.from("documents").getPublicUrl(path);
-        file_url = urlData.publicUrl;
-        file_name = data.file.name;
-      }
-
-      const { error } = await supabase.from("documents").insert({
-        user_id: user!.id,
-        title: data.title,
-        description: data.description,
-        category: data.category,
-        file_url,
-        file_name,
+      const res = await fetch("/api/documents", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders(),
+        },
+        body: JSON.stringify({
+          title: data.title,
+          description: data.description,
+          category: data.category,
+          file_url,
+          file_name,
+        }),
       });
-      if (error) throw error;
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Error guardando documento");
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["documents"] });
@@ -108,17 +107,14 @@ export const useAddDocument = () => {
 
 export const useToggleFavorite = () => {
   const qc = useQueryClient();
-  const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async ({ documentId, starred }: { documentId: string; starred: boolean }) => {
-      if (starred) {
-        const { error } = await supabase.from("favorites").delete().eq("user_id", user!.id).eq("document_id", documentId);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("favorites").insert({ user_id: user!.id, document_id: documentId });
-        if (error) throw error;
-      }
+    mutationFn: async ({ documentId }: { documentId: string; starred?: boolean }) => {
+      const res = await fetch(`/api/documents/${documentId}/favorite`, {
+        method: "POST",
+        headers: authHeaders(),
+      });
+      if (!res.ok) throw new Error("Error actualizando favorito");
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["documents"] });

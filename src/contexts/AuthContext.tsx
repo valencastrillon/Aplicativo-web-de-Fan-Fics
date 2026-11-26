@@ -1,6 +1,4 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import type { User as SupabaseUser, Session } from "@supabase/supabase-js";
 
 interface User {
   id: string;
@@ -19,19 +17,16 @@ interface AuthContextType {
   updateProfile: (data: { username?: string; email?: string; password?: string }) => Promise<boolean>;
 }
 
+const TOKEN_KEY = "nocturna_token";
+
 const AuthContext = createContext<AuthContextType | null>(null);
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
 };
-
-const mapUser = (su: SupabaseUser): User => ({
-  id: su.id,
-  username: su.user_metadata?.username || su.email?.split("@")[0] || "Usuario",
-  email: su.email || "",
-});
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -39,73 +34,123 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isDemo, setIsDemo] = useState(false);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        setUser(mapUser(session.user));
-        setIsDemo(false);
-      } else if (!isDemo) {
-        setUser(null);
-      }
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) {
       setLoading(false);
-    });
+      return;
+    }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setUser(mapUser(session.user));
-      }
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    fetch("/api/auth/me", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          localStorage.removeItem(TOKEN_KEY);
+          return null;
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (data?.user) {
+          setUser(data.user);
+        }
+      })
+      .catch(() => {
+        localStorage.removeItem(TOKEN_KEY);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return { ok: false, error: error.message };
-    return { ok: true };
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) return { ok: false, error: data.error || "Error al iniciar sesión" };
+
+      localStorage.setItem(TOKEN_KEY, data.token);
+      setIsDemo(false);
+      setUser(data.user);
+      return { ok: true };
+    } catch {
+      return { ok: false, error: "No se pudo conectar con el servidor" };
+    }
   }, []);
 
   const register = useCallback(async (username: string, email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { username }, emailRedirectTo: window.location.origin },
-    });
-    if (error) return { ok: false, error: error.message };
-    return { ok: true };
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) return { ok: false, error: data.error || "Error al registrarse" };
+
+      localStorage.setItem(TOKEN_KEY, data.token);
+      setIsDemo(false);
+      setUser(data.user);
+      return { ok: true };
+    } catch {
+      return { ok: false, error: "No se pudo conectar con el servidor" };
+    }
   }, []);
 
   const loginDemo = useCallback(() => {
+    localStorage.removeItem(TOKEN_KEY);
     setIsDemo(true);
     setUser({ id: "demo-001", username: "Lector Demo", email: "demo@nocturna.app" });
   }, []);
 
-  const logout = useCallback(async () => {
-    if (isDemo) {
-      setUser(null);
-      setIsDemo(false);
-      return;
-    }
-    await supabase.auth.signOut();
+  const logout = useCallback(() => {
+    localStorage.removeItem(TOKEN_KEY);
     setUser(null);
-  }, [isDemo]);
+    setIsDemo(false);
+  }, []);
 
-  const updateProfile = useCallback(async (data: { username?: string; email?: string; password?: string }) => {
-    if (isDemo) {
-      setUser((prev) => prev ? { ...prev, ...(data.username ? { username: data.username } : {}), ...(data.email ? { email: data.email } : {}) } : prev);
-      return true;
-    }
-    const updates: Record<string, unknown> = {};
-    if (data.email) updates.email = data.email;
-    if (data.password) updates.password = data.password;
-    if (data.username) updates.data = { username: data.username };
-    const { error } = await supabase.auth.updateUser(updates);
-    if (error) return false;
-    if (data.username || data.email) {
-      setUser((prev) => prev ? { ...prev, ...(data.username ? { username: data.username } : {}), ...(data.email ? { email: data.email } : {}) } : prev);
-    }
-    return true;
-  }, [isDemo]);
+  const updateProfile = useCallback(
+    async (data: { username?: string; email?: string; password?: string }) => {
+      if (isDemo) {
+        setUser((prev) =>
+          prev
+            ? {
+                ...prev,
+                ...(data.username ? { username: data.username } : {}),
+                ...(data.email ? { email: data.email } : {}),
+              }
+            : prev
+        );
+        return true;
+      }
+
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (!token) return false;
+
+      try {
+        const res = await fetch("/api/auth/profile", {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(data),
+        });
+        if (!res.ok) return false;
+
+        const result = await res.json();
+        if (result?.user) setUser(result.user);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [isDemo]
+  );
 
   return (
     <AuthContext.Provider value={{ user, isAuthenticated: !!user, loading, login, register, loginDemo, logout, updateProfile }}>

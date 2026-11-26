@@ -1,6 +1,20 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+
+const TOKEN_KEY = "nocturna_token";
+
+const authHeaders = (): Record<string, string> => {
+  const token = localStorage.getItem(TOKEN_KEY);
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+const fileToDataUrl = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 
 const getDemoPosts = (): Post[] => {
   const now = Date.now();
@@ -81,39 +95,11 @@ export const usePosts = () => {
     queryFn: async (): Promise<Post[]> => {
       if (isDemo) return getDemoPosts();
 
-      const { data: posts, error } = await supabase
-        .from("posts")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-
-      const postIds = (posts || []).map((p) => p.id);
-
-      const { data: comments } = await supabase
-        .from("comments")
-        .select("*")
-        .in("post_id", postIds.length > 0 ? postIds : ["__none__"])
-        .order("created_at", { ascending: true });
-
-      const { data: likes } = await supabase
-        .from("post_likes")
-        .select("post_id")
-        .eq("user_id", user!.id);
-
-      const likedSet = new Set(likes?.map((l) => l.post_id) || []);
-      const commentsByPost: Record<string, Comment[]> = {};
-      (comments || []).forEach((c) => {
-        if (!commentsByPost[c.post_id]) commentsByPost[c.post_id] = [];
-        commentsByPost[c.post_id].push(c);
+      const res = await fetch("/api/posts", {
+        headers: authHeaders(),
       });
-
-      return (posts || []).map((p) => ({
-        ...p,
-        text: p.text || "",
-        liked: likedSet.has(p.id),
-        comments: commentsByPost[p.id] || [],
-      }));
+      if (!res.ok) throw new Error("Error cargando publicaciones");
+      return res.json();
     },
     enabled: !!user,
     staleTime: isDemo ? Infinity : 0,
@@ -122,27 +108,23 @@ export const usePosts = () => {
 
 export const useCreatePost = () => {
   const qc = useQueryClient();
-  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async (data: { text: string; imageFile?: File }) => {
-      let image_url: string | null = null;
+      const image_url = data.imageFile ? await fileToDataUrl(data.imageFile) : null;
 
-      if (data.imageFile) {
-        const path = `${user!.id}/${Date.now()}_${data.imageFile.name}`;
-        const { error: uploadError } = await supabase.storage.from("post-images").upload(path, data.imageFile);
-        if (uploadError) throw uploadError;
-        const { data: urlData } = supabase.storage.from("post-images").getPublicUrl(path);
-        image_url = urlData.publicUrl;
-      }
-
-      const { error } = await supabase.from("posts").insert({
-        user_id: user!.id,
-        author_name: user!.username,
-        text: data.text,
-        image_url,
+      const res = await fetch("/api/posts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders(),
+        },
+        body: JSON.stringify({ text: data.text, image_url }),
       });
-      if (error) throw error;
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Error creando publicación");
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["posts"] });
@@ -152,19 +134,14 @@ export const useCreatePost = () => {
 
 export const useToggleLike = () => {
   const qc = useQueryClient();
-  const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async ({ postId, liked }: { postId: string; liked: boolean }) => {
-      if (liked) {
-        await supabase.from("post_likes").delete().eq("user_id", user!.id).eq("post_id", postId);
-        await supabase.from("posts").update({ likes_count: Math.max(0, 0) }).eq("id", postId);
-      } else {
-        await supabase.from("post_likes").insert({ user_id: user!.id, post_id: postId });
-      }
-      // Update count
-      const { count } = await supabase.from("post_likes").select("*", { count: "exact", head: true }).eq("post_id", postId);
-      await supabase.from("posts").update({ likes_count: count || 0 }).eq("id", postId);
+    mutationFn: async ({ postId }: { postId: string; liked?: boolean }) => {
+      const res = await fetch(`/api/posts/${postId}/like`, {
+        method: "POST",
+        headers: authHeaders(),
+      });
+      if (!res.ok) throw new Error("Error al dar like");
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["posts"] });
@@ -174,17 +151,18 @@ export const useToggleLike = () => {
 
 export const useAddComment = () => {
   const qc = useQueryClient();
-  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async ({ postId, text }: { postId: string; text: string }) => {
-      const { error } = await supabase.from("comments").insert({
-        user_id: user!.id,
-        post_id: postId,
-        author_name: user!.username,
-        text,
+      const res = await fetch(`/api/posts/${postId}/comments`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders(),
+        },
+        body: JSON.stringify({ text }),
       });
-      if (error) throw error;
+      if (!res.ok) throw new Error("Error agregando comentario");
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["posts"] });
@@ -197,8 +175,15 @@ export const useEditComment = () => {
 
   return useMutation({
     mutationFn: async ({ commentId, text }: { commentId: string; text: string }) => {
-      const { error } = await supabase.from("comments").update({ text }).eq("id", commentId);
-      if (error) throw error;
+      const res = await fetch(`/api/comments/${commentId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders(),
+        },
+        body: JSON.stringify({ text }),
+      });
+      if (!res.ok) throw new Error("Error editando comentario");
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["posts"] });
@@ -211,8 +196,11 @@ export const useDeleteComment = () => {
 
   return useMutation({
     mutationFn: async (commentId: string) => {
-      const { error } = await supabase.from("comments").delete().eq("id", commentId);
-      if (error) throw error;
+      const res = await fetch(`/api/comments/${commentId}`, {
+        method: "DELETE",
+        headers: authHeaders(),
+      });
+      if (!res.ok) throw new Error("Error eliminando comentario");
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["posts"] });
@@ -225,8 +213,11 @@ export const useDeletePost = () => {
 
   return useMutation({
     mutationFn: async (postId: string) => {
-      const { error } = await supabase.from("posts").delete().eq("id", postId);
-      if (error) throw error;
+      const res = await fetch(`/api/posts/${postId}`, {
+        method: "DELETE",
+        headers: authHeaders(),
+      });
+      if (!res.ok) throw new Error("Error eliminando publicación");
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["posts"] });
