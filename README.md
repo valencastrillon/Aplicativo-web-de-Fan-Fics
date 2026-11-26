@@ -159,4 +159,4 @@ npm run dev
 
 ## Licencia
 
-El código fuente se distribuye bajo la licencia [**MIT**]().
+Este proyecto se distribuye bajo la licencia **MIT**. Consulta el archivo [LICENSE](./LICENSE) para más detalles.
